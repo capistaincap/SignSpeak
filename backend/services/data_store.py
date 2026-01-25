@@ -10,6 +10,11 @@ class DataStore:
             "flex": [0, 0, 0, 0, 0],
             "last_updated": 0
         }
+        self.config = {
+            "use_gemini": True,
+            "lang": "en",
+            "auto_speak": False 
+        }
 
     def update(self, new_data):
         with self.lock:
@@ -18,7 +23,13 @@ class DataStore:
 
     def get(self):
         with self.lock:
-            return self.latest_data.copy()
+            data = self.latest_data.copy()
+            data.update(self.config) # Merge config into response
+            return data
+
+    def update_config(self, new_config):
+        with self.lock:
+            self.config.update(new_config)
 
 # Global Instance
 data_store = DataStore()

@@ -6,5 +6,5 @@ load_dotenv()
 BACKEND_NAME = "SignSpeak Backend"
 POLL_RATE_HZ = 10
 # Secrets
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCEgIbue16NfOZhinZFdLCZ3gSd3GOqAQM")
 USE_GEMINI = True

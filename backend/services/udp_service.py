@@ -16,6 +16,10 @@ class UDPService:
         self.running = False
         self.thread = None
         self.lock = threading.Lock()
+        self.on_data_callback = None
+
+    def register_callback(self, callback):
+        self.on_data_callback = callback
 
     def start(self):
         if self.running:
@@ -51,7 +55,31 @@ class UDPService:
                 if not line:
                     continue
 
-                # Format: "FLEX:f1,f2,f3,f4 | ACC:ax,ay,az | GYR:gx,gy,gz"
+                # Expecting format: "f1,f2,f3,f4,ax,ay,az" (7 values)
+                if "," in line and "|" not in line:
+                    parts = line.split(',')
+                    if len(parts) >= 7:
+                        # Parse values
+                        vals = [float(x) for x in parts[:7]]
+                        
+                        flex_vals = vals[0:4]
+                        acc_vals = vals[4:7] # ax, ay, az
+
+                        # Update Global Data Store
+                        data_store.update({
+                            "flex": flex_vals,
+                            "ax": acc_vals[0], "ay": acc_vals[1], "az": acc_vals[2],
+                            "gx": 0, "gy": 0, "gz": 0
+                        })
+                        
+                        if self.on_data_callback:
+                            self.on_data_callback(flex_vals, acc_vals)
+                            
+                        # Debug: Show we received it (similar to Serial)
+                        print(f"UDP Recv: {flex_vals} | ACC: {acc_vals}") 
+                        # return # Skip legacy check
+
+                # Old Format: "FLEX:f1,f2,f3,f4 | ACC:ax,ay,az | GYR:gx,gy,gz"
                 if "FLEX:" in line and "| ACC:" in line:
                     parts = line.split('|')
                     

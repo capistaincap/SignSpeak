@@ -34,7 +34,7 @@ function App() {
   };
 
   // ---------------- BACKEND POLLING ----------------
-  const BACKEND_URL = `http://${backendIP}:8000/imu`;
+  const BACKEND_URL = `http://${backendIP}:8000/sensors`;
 
   useEffect(() => {
     let isMounted = true;
@@ -45,7 +45,7 @@ function App() {
       if (!isSystemOn) return;
       const startTime = performance.now();
 
-      fetch(`${BACKEND_URL}?use_gemini=${useGemini}&lang=${language}`, { signal })
+      fetch(`${BACKEND_URL}?use_gemini=${useGemini}&lang=${language}&auto_speak=${autoSpeak}`, { signal })
         .then(res => {
           if (!res.ok) throw new Error('Network response was not ok');
           return res.json();
@@ -64,7 +64,6 @@ function App() {
           const g = data.gesture || 'WAITING';
           if (g !== 'WAITING' && g !== gesture) {
             setGesture(g);
-            setSentence(data.sentence || `Detected gesture: ${g}`);
             addLog(`Detected: ${g}`);
 
             // Icon Map
@@ -75,10 +74,13 @@ function App() {
               STOP: 'fas fa-hand-paper'
             };
             setGestureIcon(icons[g] || 'fas fa-hand-paper');
+          }
 
-            if (autoSpeakRef.current && lastSpokenGesture.current !== g) {
-              speakSentence(data.sentence || g);
-              lastSpokenGesture.current = g;
+          // Always update sentence if it changes (Decoupled from gesture)
+          if (data.sentence && data.sentence !== sentence) {
+            setSentence(data.sentence);
+            if (autoSpeakRef.current && data.sentence !== 'Processing...' && data.sentence !== 'Waiting for gesture...') {
+              speakSentence(data.sentence);
             }
           }
           if (g === 'WAITING') {
@@ -106,20 +108,14 @@ function App() {
   // ---------------- TTS ----------------
   const speakSentence = async (text) => {
     if (!text || text === 'Waiting for gesture...') return;
+
     try {
-      const audioUrl = `http://${backendIP}:8000/audio/speak?text=${encodeURIComponent(text)}&lang=${language}`;
-      const response = await fetch(audioUrl);
-      if (response.ok) {
-        const blob = await response.blob();
-        new Audio(URL.createObjectURL(blob)).play();
-        return;
-      }
+      // Use Server-Side Playback (Robust)
+      const audioUrl = `http://${backendIP}:8000/audio/speak/server?text=${encodeURIComponent(text)}`;
+      await fetch(audioUrl);
     } catch (e) {
-      console.warn("Backend TTS failed");
+      console.warn("Backend TTS failed:", e);
     }
-    // Fallback
-    const u = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(u);
   };
 
   // ---------------- RENDER ----------------
@@ -199,7 +195,18 @@ function App() {
             <div className="card card-ai">
               <div className="card-title">
                 <span style={{ color: 'white' }}>AI Sentence</span>
-                <i className="fas fa-brain" style={{ color: '#BEE8D0' }}></i>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <i
+                    className="fas fa-sync-alt"
+                    style={{ color: '#9CA3AF', cursor: 'pointer' }}
+                    onClick={() => {
+                      setSentence('Waiting for gesture...');
+                      setGesture('WAITING');
+                    }}
+                    title="Reset Display"
+                  ></i>
+                  <i className="fas fa-brain" style={{ color: '#BEE8D0' }}></i>
+                </div>
               </div>
 
               <div className="ai-text">
@@ -213,10 +220,36 @@ function App() {
 
             {/* SPEECH STATUS ROW */}
             <div className="status-row">
-              <div className="card-stat">
+              {/* AUTO SPEAK TOGGLE */}
+              <div className="card-stat" onClick={() => setAutoSpeak(!autoSpeak)} style={{ cursor: 'pointer', background: autoSpeak ? 'rgba(230, 212, 143, 0.1)' : 'rgba(255,255,255,0.05)' }}>
                 <span className="stat-label">Audio</span>
-                <span className="stat-value highlight">{autoSpeak ? 'ON' : 'OFF'}</span>
+                <div style={{
+                  marginTop: 5,
+                  width: 36, height: 20, background: autoSpeak ? '#E6D48F' : '#333',
+                  borderRadius: 10, position: 'relative', transition: 'all 0.2s', margin: '0 auto'
+                }}>
+                  <div style={{
+                    width: 14, height: 14, background: 'white', borderRadius: '50%',
+                    position: 'absolute', top: 3, left: autoSpeak ? 19 : 3, transition: 'all 0.2s'
+                  }}></div>
+                </div>
               </div>
+
+              {/* GEMINI TOGGLE */}
+              <div className="card-stat" onClick={() => setUseGemini(!useGemini)} style={{ cursor: 'pointer', background: useGemini ? 'rgba(230, 212, 143, 0.1)' : 'rgba(255,255,255,0.05)' }}>
+                <span className="stat-label">AI Enhance</span>
+                <div style={{
+                  marginTop: 5,
+                  width: 36, height: 20, background: useGemini ? '#E6D48F' : '#333',
+                  borderRadius: 10, position: 'relative', transition: 'all 0.2s', margin: '0 auto'
+                }}>
+                  <div style={{
+                    width: 14, height: 14, background: 'white', borderRadius: '50%',
+                    position: 'absolute', top: 3, left: useGemini ? 19 : 3, transition: 'all 0.2s'
+                  }}></div>
+                </div>
+              </div>
+
               <div className="card-stat">
                 <span className="stat-label">Lang</span>
                 <span className="stat-value">{language.toUpperCase()}</span>
@@ -289,43 +322,7 @@ function App() {
             <div className="card">
               <div className="card-title">Preferences</div>
 
-              <div className="setting-row">
-                <div>
-                  <div style={{ color: 'white' }}>Auto-Speak</div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>TTS on detection</div>
-                </div>
-                <div
-                  onClick={() => setAutoSpeak(!autoSpeak)}
-                  style={{
-                    width: 44, height: 24, background: autoSpeak ? '#E6D48F' : '#333',
-                    borderRadius: 12, position: 'relative', transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, background: 'white', borderRadius: '50%',
-                    position: 'absolute', top: 3, left: autoSpeak ? 23 : 3, transition: 'all 0.2s'
-                  }}></div>
-                </div>
-              </div>
 
-              <div className="setting-row">
-                <div>
-                  <div style={{ color: 'white' }}>AI Enhancement</div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>Gemini models</div>
-                </div>
-                <div
-                  onClick={() => setUseGemini(!useGemini)}
-                  style={{
-                    width: 44, height: 24, background: useGemini ? '#E6D48F' : '#333',
-                    borderRadius: 12, position: 'relative', transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, background: 'white', borderRadius: '50%',
-                    position: 'absolute', top: 3, left: useGemini ? 23 : 3, transition: 'all 0.2s'
-                  }}></div>
-                </div>
-              </div>
 
             </div>
 
@@ -350,11 +347,15 @@ function App() {
                   }}
                 >
                   <option value="en">English (US)</option>
+                  <option value="hi">Hindi (हिंदी)</option>
+                  <option value="mr">Marathi (मराठी)</option>
+                  <option value="bn">Bengali (বাংলা)</option>
+                  <option value="gu">Gujarati (ગુજરાતી)</option>
+                  <option value="ta">Tamil (தமிழ்)</option>
+                  <option value="te">Telugu (తెలుగు)</option>
                   <option value="es">Spanish (Español)</option>
                   <option value="fr">French (Français)</option>
                   <option value="de">German (Deutsch)</option>
-                  <option value="hi">Hindi (हिंदी)</option>
-                  <option value="mr">Marathi (मराठी)</option>
                   <option value="zh">Chinese (Mandarin)</option>
                   <option value="ja">Japanese (Nihongo)</option>
                   <option value="ko">Korean (Hangul)</option>

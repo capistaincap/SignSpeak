@@ -215,8 +215,12 @@ function HistoryScreen({ logs }) {
 function SettingsScreen({ ip, setIp, autoSpeak, setAutoSpeak, language, setLanguage }) {
   const languages = [
     { code: 'en', name: 'English (US)' },
-    { code: 'hi', name: 'Hindi' },
-    { code: 'mr', name: 'Marathi' },
+    { code: 'hi', name: 'Hindi (हिंदी)' },
+    { code: 'mr', name: 'Marathi (मराठी)' },
+    { code: 'bn', name: 'Bengali (বাংলা)' },
+    { code: 'gu', name: 'Gujarati (ગુજરાતી)' },
+    { code: 'ta', name: 'Tamil (தமிழ்)' },
+    { code: 'te', name: 'Telugu (తెలుగు)' },
     { code: 'es', name: 'Spanish' },
     { code: 'fr', name: 'French' },
     { code: 'de', name: 'German' },
@@ -265,19 +269,27 @@ function SettingsScreen({ ip, setIp, autoSpeak, setAutoSpeak, language, setLangu
         {/* LANGUAGE */}
         <View style={[styles.card, { marginTop: 16 }]}>
           <Text style={styles.cardTitle}>Target Language</Text>
-          {languages.map(lang => (
-            <TouchableOpacity
-              key={lang.code}
-              style={[
-                styles.langItem,
-                language === lang.code && { backgroundColor: 'rgba(230, 212, 143, 0.1)', borderColor: THEME.primary }
-              ]}
-              onPress={() => setLanguage(lang.code)}
-            >
-              <Text style={{ color: language === lang.code ? THEME.primary : 'white' }}>{lang.name}</Text>
-              {language === lang.code && <Ionicons name="checkmark" color={THEME.primary} size={18} />}
-            </TouchableOpacity>
-          ))}
+          {languages.map(lang => {
+            const isActive = language === lang.code;
+            return (
+              <TouchableOpacity
+                key={lang.code}
+                style={[
+                  styles.langItem,
+                  isActive && { backgroundColor: THEME.primary, borderColor: THEME.primary }
+                ]}
+                onPress={() => setLanguage(lang.code)}
+              >
+                <Text style={{
+                  color: isActive ? 'black' : 'white',
+                  fontWeight: isActive ? 'bold' : 'normal'
+                }}>
+                  {lang.name}
+                </Text>
+                {isActive && <Ionicons name="checkmark-circle" color="black" size={20} />}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
       </ScrollView>
@@ -325,7 +337,7 @@ export default function App() {
       // Timeout protection
       setTimeout(() => controller.abort(), 2000);
 
-      fetch(`http://${ip}:8000/imu?lang=${language}`, { signal: controller.signal })
+      fetch(`http://${ip}:8000/sensors?lang=${language}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setLatency(Date.now() - start);

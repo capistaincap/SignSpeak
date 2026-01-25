@@ -17,6 +17,11 @@ class SerialService:
         self.running = False
         self.thread = None
         self.lock = threading.Lock()
+        self.on_data_callback = None # Callback function(flex_vals, acc_vals)
+
+    def register_callback(self, callback):
+        """Register a function to be called when valid data is received"""
+        self.on_data_callback = callback
 
     def _find_esp32_port(self):
         """Auto-detect a likely ESP32/Arduino port"""
@@ -62,24 +67,27 @@ class SerialService:
                 if not line:
                     continue
                 
-                # Format: "FLEX:f1,f2,f3,f4 | ACC:ax,ay,az | GYR:gx,gy,gz"
-                if "FLEX:" in line and "| ACC:" in line:
-                    parts = line.split('|')
-                    
-                    flex_str = parts[0].split(':')[1]
-                    acc_str = parts[1].split(':')[1]
-                    gyr_str = parts[2].split(':')[1]
+                # Expecting format: "f1,f2,f3,f4,ax,ay,az" (7 values)
+                if "," in line:
+                    parts = line.split(',')
+                    if len(parts) >= 7:
+                        # Parse values
+                        vals = [float(x) for x in parts[:7]]
+                        
+                        flex_vals = vals[0:4]
+                        acc_vals = vals[4:7] # ax, ay, az
 
-                    flex_vals = [float(x) for x in flex_str.split(',')]
-                    acc_vals = [float(x) for x in acc_str.split(',')]
-                    gyr_vals = [float(x) for x in gyr_str.split(',')]
+                        # Update Global Data Store (Legacy support for frontend)
+                        data_store.update({
+                            "flex": flex_vals,
+                            "ax": acc_vals[0], "ay": acc_vals[1], "az": acc_vals[2],
+                            # Zero out gyro/others if not present in this format
+                            "gx": 0, "gy": 0, "gz": 0
+                        })
 
-                    # Update Global Data Store
-                    data_store.update({
-                        "flex": flex_vals,
-                        "ax": acc_vals[0], "ay": acc_vals[1], "az": acc_vals[2],
-                        "gx": gyr_vals[0], "gy": gyr_vals[1], "gz": gyr_vals[2]
-                    })
+                        # Trigger Callback for ML
+                        if self.on_data_callback:
+                            self.on_data_callback(flex_vals, acc_vals)
 
             except (ValueError, IndexError):
                 continue # Ignore parse errors (common during startup)

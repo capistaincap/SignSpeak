@@ -376,3 +376,34 @@ body {
   bottom: 0;
   border-radius: 4px;
 }
+
+/* Fix for White Dropdown / Select Options */
+select {
+  background-color: var(--card-bg) !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+select option {
+  background-color: #1E1E1E !important;
+  color: white !important;
+  padding: 10px;
+}
+
+/* Scrollbar Styling for Dark Mode */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0B0B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E6D48F;
+}

@@ -3,3 +3,9 @@ uvicorn
 pyserial
 google-generativeai
 python-dotenv
+scikit-learn
+joblib
+pandas
+pyttsx3
+edge-tts
+pygame
