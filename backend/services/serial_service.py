@@ -33,7 +33,7 @@ class SerialService:
         # Fallback to first available if any
         if ports:
             return ports[0].device
-        return "COM10" # Default fallback
+        return None # Return None if no ports found
 
     def start(self):
         if self.running:
@@ -41,12 +41,18 @@ class SerialService:
         
         target_port = self.port if self.port else self._find_esp32_port()
         
+        if not target_port:
+            logger.info("⚠️ No Serial ports found. Serial service skipped (Wireless Mode).")
+            return
+
         try:
             self.ser = serial.Serial(target_port, self.baud_rate, timeout=1)
             self.running = True
             self.thread = threading.Thread(target=self._read_loop, daemon=True)
             self.thread.start()
             logger.info(f"✅ SERIAL CONNECTED: {target_port} @ {self.baud_rate}")
+        except PermissionError:
+             logger.warning(f"⚠️ Serial port {target_port} busy or unavailable (Access Denied). Continuing in Wireless Mode.")
         except serial.SerialException as e:
             logger.error(f"❌ SERIAL ERROR: Could not connect to {target_port}: {e}")
             # Try to list available ports to help user

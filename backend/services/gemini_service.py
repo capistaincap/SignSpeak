@@ -1,63 +1,132 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 import logging
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
+
 class GeminiService:
+    """
+    Gemini is used ONLY for sentence construction (English).
+    No translation is performed here.
+    """
+
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        self.model = None
-        
-        if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
-                logger.info("✅ Gemini Service Initialized (Model: gemini-2.0-flash-lite)")
-            except Exception as e:
-                logger.error(f"❌ Gemini Init Error: {e}")
-        else:
+        self.client = None
+
+        # Circuit Breaker
+        self.circuit_open = False
+        self.last_error_time = 0
+        self.cooldown_seconds = 60
+
+        if not self.api_key:
             logger.warning("⚠️ GEMINI_API_KEY not found in .env")
+            return
+
+        try:
+            self.client = genai.Client(api_key=self.api_key)
+            logger.info("✅ Gemini (GenAI) initialized (English sentence mode)")
+
+        except Exception as e:
+            logger.error(f"❌ Gemini Init Error: {e}")
 
     def generate_sentence(self, words):
         """
-        Takes a list of words (e.g. ['I', 'Eat', 'Apple']) and returns a natural sentence.
+        words: list[str] OR str → output of ML model
+        RETURNS: English sentence only
         """
+
         if not words:
             return None
-            
-        # --- HARDCODED OVERRIDE (Offline Mode for Demo) ---
-        # Bypass Gemini if specific keywords are found
-        input_debug = " ".join(words).upper()
-        if "YASH" in input_debug or "FSOCIETY" in input_debug:
-             logger.info("✨ Offline Override triggered for Team Fsociety")
-             return "Hello everyone, I'm Yash, and we are Team Fsociety."
-        # --------------------------------------------------
 
-        if not self.model:
-            return " ".join(words)
+        # -------- NORMALIZE ML OUTPUT --------
+        if isinstance(words, list):
+            base_text = " ".join(words)
+        else:
+            base_text = str(words)
+
+        base_text = base_text.lower().capitalize()
+        normalized = base_text.lower()
+        # ------------------------------------
+
+        # -------- DEMO OVERRIDE (SAFE & INTENTIONAL) --------
+        if "yash" in normalized and "fsociety" in normalized:
+            return "Hello, I am Yash. We are Team Fsociety."
+        # ---------------------------------------------------
+
+        # -------- FALLBACK IF GEMINI UNAVAILABLE --------
+        if not self.client:
+            return base_text
+        # -----------------------------------------------
+
+        # -------- CIRCUIT BREAKER --------
+        if self.circuit_open:
+            elapsed = time.time() - self.last_error_time
+            if elapsed < self.cooldown_seconds:
+                logger.warning("⚠️ Gemini in cooldown, using fallback sentence")
+                return base_text
+            self.circuit_open = False
+            logger.info("♻️ Gemini recovered after cooldown")
+        # --------------------------------
+
+        # -------- ENGLISH-ONLY PROMPT --------
+        prompt = f"""
+        You are a sign language sentence normalizer.
+
+        Input words:
+        {base_text}
+
+        Rules:
+        - Convert the input into a clear, grammatically correct English sentence.
+        - Keep names exactly as they are (example: Yash, Fsociety).
+        - Do NOT translate.
+        - Do NOT add new meaning.
+        - Output ONLY the final sentence.
+        - No explanations.
+
+        Output:
+        """
+        # -----------------------------------
 
         try:
-            input_text = " ".join(words)
-            prompt = f"You are Yash from Team Fsociety. Fix this broken sign language input: '{input_text}'. 1. REMOVE duplicates (e.g. 'Hello Hello' -> 'Hello'). 2. If you see 'Yash' and 'Fsociety', output EXACTLY: 'Hello everyone, I am Yash, and we are Team Fsociety.' 3. Otherwise, make it a natural sentence."
-            
-            response = self.model.generate_content(prompt)
-            if response.text:
-                clean_text = response.text.strip().replace('"', '')
-                logger.info(f"✨ Gemini refined: '{input_text}' -> '{clean_text}'")
-                return clean_text
-        except Exception as e:
-            # Handle Quota/Rate Limit specifically
-            error_str = str(e)
-            if "429" in error_str or "Quota" in error_str:
-                logger.warning(f"⚠️ Gemini Rate Limit. Using raw text fallback.")
-            else:
-                logger.error(f"❌ Gemini Generation Error: {e}")
-            
-            return " ".join(words) # Graceful Fallback
+            response = self.client.models.generate_content(
+                model="gemini-2.0-flash-lite",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    top_p=0.9,
+                    max_output_tokens=80
+                )
+            )
 
-# Global Instance
+            if response and response.text:
+                final_text = response.text.strip()
+
+                # Remove wrapping quotes if present
+                if final_text.startswith('"') and final_text.endswith('"'):
+                    final_text = final_text[1:-1]
+
+                logger.info(f"✨ Gemini [EN]: {final_text}")
+                return final_text
+
+        except Exception as e:
+            error = str(e).lower()
+
+            if "429" in error or "quota" in error:
+                logger.warning("⚠️ Gemini quota exceeded — circuit open (60s)")
+                self.circuit_open = True
+                self.last_error_time = time.time()
+                return base_text
+
+            logger.error(f"❌ Gemini Error: {e}")
+
+        return base_text
+
+
+# -------- GLOBAL SINGLETON --------
 gemini_service = GeminiService()

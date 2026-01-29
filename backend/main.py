@@ -1,19 +1,28 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import audio, sensors
+
 from services.udp_service import udp_service
+# from services.polling_service import polling_service
 from services.serial_service import serial_service
 from services.ml_service import ml_service
 from services.tts_service import tts_service
-import logging
+from services.gemini_service import gemini_service
+from services.data_store import data_store
 
-# Logging
+import logging
+import asyncio
+import time
+import threading
+
+# ---------------- LOGGING ----------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ---------------- APP ----------------
 app = FastAPI(title="SignSpeak Backend")
 
-# CORS
+# ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,111 +31,156 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from services.data_store import data_store
-
-from services.gemini_service import gemini_service
-import asyncio
-import time
-
-# --- STATE ---
+# ---------------- STATE ----------------
 word_buffer = []
-last_detection_time = 0
-last_spoken_time = 0 # For AI-Off mode cooldown
-SILENCE_THRESHOLD = 3.0 # Seconds
+last_detection_time = 0.0
+last_spoken_time = 0.0
+last_gemini_request_time = 0.0
 
-# --- CALLBACKS ---
-def on_ml_prediction(word):
-    """Callback when ML logic detects a new stable gesture"""
+SILENCE_THRESHOLD = 3.0        # seconds (pause before sentence formation)
+GEMINI_MIN_INTERVAL = 10.0     # seconds (quota protection)
+
+buffer_lock = threading.Lock()
+
+# ---------------- CALLBACKS ----------------
+def on_ml_prediction(word: str):
+    """
+    Called when ML detects a stable gesture
+    """
     global last_detection_time, last_spoken_time
-    logger.info(f"Main received stable word: {word}")
-    
-    # Update store for frontend (raw gesture)
+
+    logger.info(f"📥 ML stable word: {word}")
+
+    # Update frontend with raw gesture
     data_store.update({"gesture": word})
-    
-    # Buffer logic
-    # Dedup: Only add if distinct from last word
-    if not word_buffer or word_buffer[-1] != word:
-        word_buffer.append(word)
-    
+
+    # Buffer words safely
+    with buffer_lock:
+        if not word_buffer or word_buffer[-1] != word:
+            word_buffer.append(word)
+
     last_detection_time = time.time()
-    
-    # AI OFF MODE: Speak Immediately (with Delay)
+
+    # -------- AI OFF MODE (DEBUG / DEMO) --------
     use_gemini = data_store.config.get("use_gemini", True)
     auto_speak = data_store.config.get("auto_speak", False)
+    target_lang = data_store.config.get("lang", "en")
 
     if not use_gemini and auto_speak:
-        # Check cooldown to avoid repetition spam
-        if time.time() - last_spoken_time > 2.0:
-            tts_service.speak(word)
-            last_spoken_time = time.time() 
+        if time.time() - last_spoken_time > 1.5:
+            tts_service.speak(word, lang=target_lang)
+            last_spoken_time = time.time()
+
 
 def on_serial_data(flex, acc):
-    """Callback when Serial gets new sensor data"""
+    """
+    Called when Serial / UDP receives new sensor data
+    """
     ml_service.process_data(flex, acc)
 
-# --- BACKGROUND TASK ---
+# ---------------- BACKGROUND TASK ----------------
 async def sentence_formation_loop():
-    global word_buffer
-    logger.info("⏳ Sentence Formation Loop Started")
-    
-    while True:
-        await asyncio.sleep(1) # Check every second
-        
-        if word_buffer and (time.time() - last_detection_time > SILENCE_THRESHOLD):
-            # Form sentence
-            raw_words = word_buffer.copy()
-            word_buffer.clear() # Reset immediately
-            
+    """
+    Forms sentences after silence using Gemini (English only)
+    """
+    global last_gemini_request_time, last_spoken_time
+
+    logger.info("⏳ Sentence formation loop started")
+
+    loop = asyncio.get_event_loop()
+
+    try:
+        while True:
+            await asyncio.sleep(0.5)
+
+            # Wait until silence window is crossed
+            if time.time() - last_detection_time <= SILENCE_THRESHOLD:
+                continue
+
+            # Safely extract buffered words
+            with buffer_lock:
+                if not word_buffer:
+                    continue
+                raw_words = word_buffer.copy()
+                word_buffer.clear()
+
+            # Throttle Gemini calls (quota safety)
+            if time.time() - last_gemini_request_time < GEMINI_MIN_INTERVAL:
+                logger.info("⏸️ Gemini throttled, skipping cycle")
+                continue
+
             logger.info(f"📝 Forming sentence from: {raw_words}")
-            
-            # Notify frontend of processing
             data_store.update({"sentence": "Processing..."})
-            
-            # Check Toggle (AI Enhance)
+
             use_gemini = data_store.config.get("use_gemini", True)
             auto_speak = data_store.config.get("auto_speak", False)
-            
-            natural_sentence = ""
-            if use_gemini:
-                natural_sentence = gemini_service.generate_sentence(raw_words)
-            else:
-                # Raw Mode: Just join words
-                natural_sentence = " ".join(raw_words)
-            
-            if natural_sentence:
-                # Update frontend with FULL sentence
-                data_store.update({"sentence": natural_sentence})
-                
-                # Speak natural sentence (ONLY IF AUTO-SPEAK IS ON)
-                if auto_speak:
-                    tts_service.speak(natural_sentence)
+            target_lang = data_store.config.get("lang", "en")
 
+            # -------- SENTENCE GENERATION (GEMINI DISABLED) --------
+            # if use_gemini:
+            #     last_gemini_request_time = time.time()
+            #     natural_sentence = await loop.run_in_executor(
+            #         None,
+            #         gemini_service.generate_sentence,
+            #         raw_words
+            #     )
+            # else:
+            #     natural_sentence = " ".join(raw_words)
+            
+            # FORCE RAW MODE
+            natural_sentence = " ".join(raw_words)
+
+            if not natural_sentence:
+                continue
+
+            # Update frontend with final sentence (ENGLISH)
+            data_store.update({"sentence": natural_sentence})
+
+            # Speak sentence in selected language
+            if auto_speak:
+                tts_service.speak(natural_sentence, lang=target_lang)
+                last_spoken_time = time.time()
+
+    except asyncio.CancelledError:
+        logger.info("🛑 Sentence formation loop cancelled")
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error in sentence loop: {e}")
+
+# ---------------- STARTUP / SHUTDOWN ----------------
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Starting up SignSpeak Backend...")
+    logger.info("🚀 Starting SignSpeak Backend")
+
     try:
-        # Wire up the system
         ml_service.register_callback(on_ml_prediction)
         serial_service.register_callback(on_serial_data)
-        udp_service.register_callback(on_serial_data) # Reuse same callback for UDP
-        
+        udp_service.register_callback(on_serial_data)
+        # polling_service.register_callback(on_serial_data)
+
         udp_service.start()
+        # polling_service.start()
         serial_service.start()
-        
-        # Start background loop
+
         asyncio.create_task(sentence_formation_loop())
+
+        logger.info("🧠 Mode: Gemini (Sentence) + Offline TTS Translation")
+
     except Exception as e:
-        logger.error(f"Error during startup: {e}")
+        logger.error(f"❌ Startup error: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    logger.info("🛑 Shutting down backend")
     udp_service.stop()
-    # serial_service.stop()
+    # polling_service.stop()
+    # serial_service.stop()  # optional
 
-# Routes
+# ---------------- ROUTES ----------------
 app.include_router(sensors.router)
 app.include_router(audio.router, prefix="/audio", tags=["Audio"])
 
 @app.get("/")
 def root():
-    return {"status": "SignSpeak backend running (WiFi/UDP Mode)"}
+    return {"status": "SignSpeak backend running (WiFi / UDP mode)"}

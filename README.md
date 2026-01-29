@@ -215,7 +215,7 @@ SignSpeak-Smart-Glove/
 
 - [ ] On-device AI with TensorFlow Lite for Microcontrollers
 - [ ] Bilateral communication with OLED display
-- [ ] Mobile app (Flutter) for smartphone-based translation
+
 - [ ] Support for more sign language alphabets and phrases
 - [ ] Multi-language TTS support
 

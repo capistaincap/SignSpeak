@@ -120,277 +120,266 @@ function App() {
 
   // ---------------- RENDER ----------------
   return (
-    <div className="mobile-app">
+    <div className="app-container">
 
-      {/* CONNECTION OVERLAY */}
-      {!isConnected && (
-        <div className="connection-overlay">
-          <i className="fas fa-wifi" style={{ fontSize: '3rem', color: '#E6D48F', marginBottom: 20 }}></i>
-          <h2 style={{ color: 'white', fontFamily: 'Poppins', fontWeight: 700 }}>SignSpeak</h2>
-          <p style={{ color: '#9CA3AF', marginBottom: 30 }}>Connect to your smart glove</p>
-
-          <input
-            className="overlay-input"
-            value={backendIP}
-            onChange={(e) => setBackendIP(e.target.value)}
-            placeholder="IP Address (e.g. 192.168.1.5)"
-          />
-
-          <button className="btn-primary" onClick={() => setIsConnected(true)}>
-            Connect Scanner
-          </button>
-          <button style={{ background: 'transparent', border: 'none', color: '#666', marginTop: 20 }} onClick={() => setIsConnected(true)}>
-            Enter Demo Mode
-          </button>
-        </div>
-      )}
-
-      {/* HEADER */}
-      <header className="app-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            className={`power-btn ${isSystemOn ? 'on' : 'off'}`}
-            onClick={() => setIsSystemOn(!isSystemOn)}
-          >
-            <i className="fas fa-power-off"></i>
-          </div>
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="logo-icon">S</div>
           <h3>SignSpeak</h3>
         </div>
-        <div className="header-icons">
-          <div className={`status-dot ${isConnected ? 'online' : 'offline'}`}></div>
-          <div className="profile-avatar">S</div>
+
+        <nav className="sidebar-nav">
+          <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+            <i className="fas fa-home"></i> <span>Dashboard</span>
+          </button>
+          <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
+            <i className="fas fa-chart-bar"></i> <span>Analytics</span>
+          </button>
+          <button className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+            <i className="fas fa-history"></i> <span>History</span>
+          </button>
+          <button className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            <i className="fas fa-cog"></i> <span>Settings</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className={`connection-status ${isConnected ? 'online' : 'offline'}`}>
+            <div className="status-dot"></div>
+            <span>{isConnected ? 'Online' : 'Offline'}</span>
+          </div>
+          <div className="power-toggle">
+            <span>System</span>
+            <div
+              className={`power-btn-mini ${isSystemOn ? 'on' : 'off'}`}
+              onClick={() => setIsSystemOn(!isSystemOn)}
+            >
+              <i className="fas fa-power-off"></i>
+            </div>
+          </div>
         </div>
-      </header>
+      </aside>
 
-      {/* CONTENT */}
-      <main className="app-content">
+      {/* MAIN CONTENT AREA */}
+      <main className="main-content">
 
-        {/* --- TAB: DASHBOARD --- */}
-        {activeTab === 'dashboard' && (
-          <div className="tab-content">
-
-            {/* LIVE GESTURE CARD */}
-            <div className="card card-hero">
-              <div className="card-title">
-                <span>Live Gesture Recognition</span>
-                <i className="fas fa-broadcast-tower" style={{ color: '#E6D48F' }}></i>
-              </div>
-
-              <div className="hero-text">
-                {!isSystemOn ? 'PAUSED' : (gesture === 'WAITING' ? '...' : gesture)}
-              </div>
-
-              <div className="confidence-badge">
-                {!isSystemOn ? 'System Offline' : `Confidence: ${gesture === 'WAITING' ? '0%' : '94%'}`}
-              </div>
-
-              <div style={{ textAlign: 'center', marginTop: 15 }}>
-                <div className="status-chip">
-                  <i className="fas fa-circle" style={{ fontSize: 8 }}></i> Gesture Stable
-                </div>
-              </div>
-            </div>
-
-            {/* AI SENTENCE CARD */}
-            <div className="card card-ai">
-              <div className="card-title">
-                <span style={{ color: 'white' }}>AI Sentence</span>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <i
-                    className="fas fa-sync-alt"
-                    style={{ color: '#9CA3AF', cursor: 'pointer' }}
-                    onClick={() => {
-                      setSentence('Waiting for gesture...');
-                      setGesture('WAITING');
-                    }}
-                    title="Reset Display"
-                  ></i>
-                  <i className="fas fa-brain" style={{ color: '#BEE8D0' }}></i>
-                </div>
-              </div>
-
-              <div className="ai-text">
-                "{sentence}"
-              </div>
-
-              <div className="ai-tag">
-                <i className="fas fa-sparkles"></i> Powered by Gemini
-              </div>
-            </div>
-
-            {/* SPEECH STATUS ROW */}
-            <div className="status-row">
-              {/* AUTO SPEAK TOGGLE */}
-              <div className="card-stat" onClick={() => setAutoSpeak(!autoSpeak)} style={{ cursor: 'pointer', background: autoSpeak ? 'rgba(230, 212, 143, 0.1)' : 'rgba(255,255,255,0.05)' }}>
-                <span className="stat-label">Audio</span>
-                <div style={{
-                  marginTop: 5,
-                  width: 36, height: 20, background: autoSpeak ? '#E6D48F' : '#333',
-                  borderRadius: 10, position: 'relative', transition: 'all 0.2s', margin: '0 auto'
-                }}>
-                  <div style={{
-                    width: 14, height: 14, background: 'white', borderRadius: '50%',
-                    position: 'absolute', top: 3, left: autoSpeak ? 19 : 3, transition: 'all 0.2s'
-                  }}></div>
-                </div>
-              </div>
-
-              {/* GEMINI TOGGLE */}
-              <div className="card-stat" onClick={() => setUseGemini(!useGemini)} style={{ cursor: 'pointer', background: useGemini ? 'rgba(230, 212, 143, 0.1)' : 'rgba(255,255,255,0.05)' }}>
-                <span className="stat-label">AI Enhance</span>
-                <div style={{
-                  marginTop: 5,
-                  width: 36, height: 20, background: useGemini ? '#E6D48F' : '#333',
-                  borderRadius: 10, position: 'relative', transition: 'all 0.2s', margin: '0 auto'
-                }}>
-                  <div style={{
-                    width: 14, height: 14, background: 'white', borderRadius: '50%',
-                    position: 'absolute', top: 3, left: useGemini ? 19 : 3, transition: 'all 0.2s'
-                  }}></div>
-                </div>
-              </div>
-
-              <div className="card-stat">
-                <span className="stat-label">Lang</span>
-                <span className="stat-value">{language.toUpperCase()}</span>
-              </div>
-              <div className="card-stat">
-                <span className="stat-label">Latency</span>
-                <span className="stat-value highlight">{latency}ms</span>
-              </div>
-            </div>
-
-            <button className="btn-primary" onClick={() => speakSentence(sentence)}>
-              <i className="fas fa-volume-up"></i> Speak Now
+        {/* HEADER */}
+        <header className="top-header">
+          <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h2>
+          <div className="header-actions">
+            <button onClick={() => setIsConnected(true)} className="btn-connect-sm">
+              {isConnected ? 'Connected' : 'Connect Glove'}
             </button>
-
+            <div className="profile-avatar">S</div>
           </div>
-        )}
+        </header>
 
-        {/* --- TAB: ANALYTICS --- */}
-        {activeTab === 'analytics' && (
-          <div className="tab-content">
-            <div className="card">
-              <div className="card-title">Gesture Accuracy</div>
-              <div className="chart-container">
-                {[40, 70, 50, 90, 60, 80, 95].map((h, i) => (
-                  <div key={i} className="bar" style={{ height: h + '%' }}>
-                    <div className="bar-fill" style={{ height: '100%', opacity: i === 6 ? 1 : 0.4 }}></div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 10, color: '#9CA3AF', fontSize: '0.8rem' }}>Last 7 Sessions</div>
-            </div>
+        <div className="content-scrollable">
 
-            <div className="card">
-              <div className="card-title">Session Summary</div>
-              <div className="setting-row">
-                <span style={{ color: '#9CA3AF' }}>Total Gestures</span>
-                <span style={{ color: 'white', fontWeight: 'bold' }}>1,240</span>
-              </div>
-              <div className="setting-row">
-                <span style={{ color: '#9CA3AF' }}>Sentences</span>
-                <span style={{ color: 'white', fontWeight: 'bold' }}>85</span>
-              </div>
-              <div className="setting-row">
-                <span style={{ color: '#9CA3AF' }}>Avg Accuracy</span>
-                <span style={{ color: '#E6D48F', fontWeight: 'bold' }}>92%</span>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* --- TAB: DASHBOARD --- */}
+          {activeTab === 'dashboard' && (
+            <div className="dashboard-grid">
 
-        {/* --- TAB: HISTORY --- */}
-        {activeTab === 'history' && (
-          <div className="tab-content">
-            {logs.length === 0 && <div style={{ textAlign: 'center', color: '#666', marginTop: 50 }}>No recent activity</div>}
-            {logs.map(log => (
-              <div key={log.id} className="card" style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16 }}>
-                <div>
-                  <div style={{ color: 'white', fontWeight: 500 }}>{log.message}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{log.time}</div>
+              {/* LIVE GESTURE CARD (Span 2 cols) */}
+              <div className="card card-hero">
+                <div className="card-title">
+                  <span>Live Gesture Recognition</span>
+                  <i className="fas fa-broadcast-tower" style={{ color: '#E6D48F' }}></i>
                 </div>
-                <i className="fas fa-check-circle" style={{ color: '#10B981' }}></i>
+                <div className="hero-content">
+                  <div className="hero-text">
+                    {!isSystemOn ? 'PAUSED' : (gesture === 'WAITING' ? '...' : gesture)}
+                  </div>
+                  <div className="gesture-meta">
+                    <div className="confidence-badge">
+                      {!isSystemOn ? 'System Offline' : `Confidence: ${gesture === 'WAITING' ? '0%' : '94%'}`}
+                    </div>
+                    <div className="status-chip">
+                      <i className="fas fa-circle" style={{ fontSize: 8 }}></i> Stable
+                    </div>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* --- TAB: SETTINGS --- */}
-        {activeTab === 'settings' && (
-          <div className="tab-content">
-            <div className="card">
-              <div className="card-title">Preferences</div>
+              {/* AI SENTENCE CARD (Span 2 cols) */}
+              <div className="card card-ai">
+                <div className="card-title">
+                  <span style={{ color: 'white' }}>AI Sentence</span>
+                  <div className="card-actions">
+                    <i className="fas fa-sync-alt" onClick={() => { setSentence('Waiting for gesture...'); setGesture('WAITING'); }}></i>
+                    <i className="fas fa-brain" style={{ color: '#BEE8D0' }}></i>
+                  </div>
+                </div>
+                <div className="ai-text">
+                  "{sentence}"
+                </div>
+                <div className="ai-footer">
+                  <div className="ai-tag">
+                    <i className="fas fa-sparkles"></i> Powered by Gemini
+                  </div>
+                  <button className="btn-icon" onClick={() => speakSentence(sentence)}>
+                    <i className="fas fa-volume-up"></i>
+                  </button>
+                </div>
+              </div>
 
+              {/* CONTROLS ROW (Span 1 col each) */}
+              <div className="card card-stat clickable" onClick={() => setAutoSpeak(!autoSpeak)}>
+                <div className="stat-icon"><i className="fas fa-volume-up"></i></div>
+                <div className="stat-info">
+                  <span className="stat-label">Auto Speak</span>
+                  <span className={`stat-value ${autoSpeak ? 'on' : 'off'}`}>{autoSpeak ? 'ON' : 'OFF'}</span>
+                </div>
+              </div>
 
+              <div className="card card-stat clickable" onClick={() => setUseGemini(!useGemini)}>
+                <div className="stat-icon"><i className="fas fa-magic"></i></div>
+                <div className="stat-info">
+                  <span className="stat-label">AI Enhance</span>
+                  <span className={`stat-value ${useGemini ? 'on' : 'off'}`}>{useGemini ? 'ON' : 'OFF'}</span>
+                </div>
+              </div>
+
+              <div className="card card-stat">
+                <div className="stat-icon"><i className="fas fa-language"></i></div>
+                <div className="stat-info">
+                  <span className="stat-label">Target Lang</span>
+                  <span className="stat-value">{language.toUpperCase()}</span>
+                </div>
+              </div>
+
+              <div className="card card-stat">
+                <div className="stat-icon"><i className="fas fa-bolt"></i></div>
+                <div className="stat-info">
+                  <span className="stat-label">Latency</span>
+                  <span className="stat-value highlight">{latency}ms</span>
+                </div>
+              </div>
 
             </div>
+          )}
 
-            <div className="card">
-              <div className="card-title">Target Language</div>
-              <div style={{ position: 'relative' }}>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'white',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    appearance: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit'
-                  }}
-                >
-                  <option value="en">English (US)</option>
-                  <option value="hi">Hindi (हिंदी)</option>
-                  <option value="mr">Marathi (मराठी)</option>
-                  <option value="bn">Bengali (বাংলা)</option>
-                  <option value="gu">Gujarati (ગુજરાતી)</option>
-                  <option value="ta">Tamil (தமிழ்)</option>
-                  <option value="te">Telugu (తెలుగు)</option>
-                  <option value="es">Spanish (Español)</option>
-                  <option value="fr">French (Français)</option>
-                  <option value="de">German (Deutsch)</option>
-                  <option value="zh">Chinese (Mandarin)</option>
-                  <option value="ja">Japanese (Nihongo)</option>
-                  <option value="ko">Korean (Hangul)</option>
-                  <option value="ar">Arabic (Al-Arabiyya)</option>
-                </select>
-                <i className="fas fa-chevron-down" style={{
-                  position: 'absolute',
-                  right: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'rgba(255,255,255,0.5)',
-                  pointerEvents: 'none'
-                }}></i>
+          {/* --- TAB: ANALYTICS --- */}
+          {activeTab === 'analytics' && (
+            <div className="tab-content">
+              <div className="card">
+                <div className="card-title">Gesture Accuracy</div>
+                <div className="chart-container">
+                  {[40, 70, 50, 90, 60, 80, 95].map((h, i) => (
+                    <div key={i} className="bar" style={{ height: h + '%' }}>
+                      <div className="bar-fill" style={{ height: '100%', opacity: i === 6 ? 1 : 0.4 }}></div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: 'center', marginTop: 10, color: '#9CA3AF', fontSize: '0.8rem' }}>Last 7 Sessions</div>
+              </div>
+
+              <div className="card">
+                <div className="card-title">Session Summary</div>
+                <div className="setting-row">
+                  <span style={{ color: '#9CA3AF' }}>Total Gestures</span>
+                  <span style={{ color: 'white', fontWeight: 'bold' }}>1,240</span>
+                </div>
+                <div className="setting-row">
+                  <span style={{ color: '#9CA3AF' }}>Sentences</span>
+                  <span style={{ color: 'white', fontWeight: 'bold' }}>85</span>
+                </div>
+                <div className="setting-row">
+                  <span style={{ color: '#9CA3AF' }}>Avg Accuracy</span>
+                  <span style={{ color: '#E6D48F', fontWeight: 'bold' }}>92%</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
+          {/* --- TAB: HISTORY --- */}
+          {activeTab === 'history' && (
+            <div className="tab-content">
+              {logs.length === 0 && <div className="empty-state">No recent activity</div>}
+              {logs.map(log => (
+                <div key={log.id} className="card history-item">
+                  <div className="log-content">
+                    <span className="log-msg">{log.message}</span>
+                    <span className="log-time">{log.time}</span>
+                  </div>
+                  <i className="fas fa-check-circle success-icon"></i>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* --- TAB: SETTINGS --- */}
+          {activeTab === 'settings' && (
+            <div className="tab-content settings-container">
+              <div className="card">
+                <div className="card-title">General Preferences</div>
+                {/* Language Select Reposted Here */}
+                <div className="setting-row">
+                  <span>Target Language</span>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="desktop-select"
+                  >
+                    <option value="en">English (US)</option>
+                    <option value="hi">Hindi (हिंदी)</option>
+                    <option value="mr">Marathi (मराठी)</option>
+                    <option value="bn">Bengali (বাংলা)</option>
+                    <option value="gu">Gujarati (ગુજરાતી)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="te">Telugu (తెలుగు)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="zh">Chinese (Mandarin)</option>
+                    <option value="ja">Japanese (Nihongo)</option>
+                    <option value="ko">Korean (Hangul)</option>
+                    <option value="ar">Arabic (Al-Arabiyya)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="card">
+                <div className="card-title">Device Settings</div>
+                <div className="setting-row">
+                  <span>Backend IP</span>
+                  <input
+                    className="desktop-input"
+                    value={backendIP}
+                    onChange={(e) => setBackendIP(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </main>
 
-      {/* BOTTOM NAVIGATION */}
-      <nav className="bottom-nav">
-        <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <i className="fas fa-home"></i>
-        </button>
-        <button className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
-          <i className="fas fa-chart-bar"></i>
-        </button>
-        <button className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-          <i className="fas fa-history"></i>
-        </button>
-        <button className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-          <i className="fas fa-cog"></i>
-        </button>
-      </nav>
+      {/* CONNECTION OVERLAY - OPTIONAL FOR DESKTOP (Can be a constrained modal) */}
+      {!isConnected && (
+        <div className="connection-modal-backdrop">
+          <div className="connection-modal">
+            <i className="fas fa-wifi" style={{ fontSize: '3rem', color: '#E6D48F', marginBottom: 20 }}></i>
+            <h2>SignSpeak</h2>
+            <p>Connect to your smart glove</p>
+
+            <input
+              className="overlay-input"
+              value={backendIP}
+              onChange={(e) => setBackendIP(e.target.value)}
+              placeholder="IP Address (e.g. 192.168.1.5)"
+            />
+
+            <button className="btn-primary" onClick={() => setIsConnected(true)}>
+              Connect Scanner
+            </button>
+            <button className="btn-text" onClick={() => setIsConnected(true)}>
+              Enter Demo Mode
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -82,7 +82,7 @@
 
 - On-device AI with TensorFlow Lite
 - Bilateral communication with OLED display
-- Mobile app (Flutter)
+
 - Multi-language support
 - Cloud synchronization
 - Gesture library expansion

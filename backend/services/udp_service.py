@@ -27,6 +27,7 @@ class UDPService:
 
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind((self.host, self.port))
             # Set timeout to allow check for 'running' flag periodically
             self.sock.settimeout(1.0) 

@@ -77,6 +77,6 @@ Traditional methodologies for sign language interpretation often require human i
 5.  **Output**: Natural Sentence -> TTS Engine -> Speaker/Dashboard.
 
 ## 7. Future Roadmap
-*   **Mobile App**: Develop a dedicated mobile application (Flutter/React Native) for better portability.
+
 *   **Custom Gestures**: Allow users to record and train their own custom gestures.
 *   **Two-Way Communication**: Implement Speech-to-Text on the users' device to display what the other person is saying on a small screen or the phone.

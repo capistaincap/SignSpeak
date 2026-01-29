@@ -70,60 +70,51 @@
 #         raise HTTPException(status_code=500, detail=str(e))
 
 
-from fastapi import APIRouter, HTTPException, Query, Response
-import edge_tts
-import asyncio
-import os
-import signal
-import subprocess
+from fastapi import APIRouter, HTTPException, Query
 import logging
+from services.tts_service import tts_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+logger.info("✅ audio.py module loaded (Pygame version)")
 
-# ... (Keep your VOICE_MAP here) ...
-
-# Global variable to track the playback process
-current_playback_proc = None
+# VOICE MAPPING (Neural Voices)
+VOICE_MAP = {
+    "en": "en-US-ChristopherNeural",   # Male, Deep, Clear
+    "hi": "hi-IN-MadhurNeural",        # Male, Natural Hindi
+    "mr": "mr-IN-ManoharNeural",       # Male, Natural Marathi
+    "bn": "bn-IN-BashkarNeural",       # Bengali
+    "gu": "gu-IN-NiranjanNeural",      # Gujarati
+    "ta": "ta-IN-ValluvarNeural",      # Tamil
+    "te": "te-IN-MohanNeural",         # Telugu
+    "kn": "kn-IN-GaganNeural",         # Kannada
+    "ml": "ml-IN-MidhunNeural",        # Malayalam
+    # Fallback
+    "default": "en-US-ChristopherNeural"
+}
 
 @router.post("/speak/stop")
 async def stop_server_audio():
     """Forcefully stops the audio playback on the laptop."""
-    global current_playback_proc
-    if current_playback_proc:
-        try:
-            # On Windows, this kills the player process
-            current_playback_proc.terminate()
-            # If using 'start' command, we might need a harsher kill:
-            os.system("taskkill /IM mpv.exe /F /T") # or wmplayer.exe
-            logger.info("🛑 Playback stopped by user toggle.")
-            current_playback_proc = None
-            return {"status": "stopped"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    return {"status": "idle"}
+    try:
+        tts_service.stop()
+        return {"status": "stopped"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @router.get("/speak/server")
 async def speak_on_server(text: str = Query(...), lang: str = Query("en")):
-    """Triggers TTS on the Laptop speakers and tracks the process."""
-    global current_playback_proc
-    
+    """Triggers TTS on the Laptop speakers using Pygame."""
+    logger.info(f"🔊 Pygame TTS Request: '{text}'")
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
 
     # 1. Stop any existing audio first
-    await stop_server_audio()
+    tts_service.stop()
 
     try:
-        voice = VOICE_MAP.get(lang.lower(), VOICE_MAP["default"])
-        output_file = "temp_speech.mp3"
-        
-        # 2. Generate the file using edge-tts (Command Line tool is often faster for server-side)
-        # We use Popen so it doesn't block the FastAPI loop
-        cmd = f'edge-tts --voice {voice} --text "{text}" --write-media {output_file} && ffplay -nodisp -autoexit {output_file}'
-        
-        # Note: 'ffplay' is excellent for this. If you don't have it, use 'start' or 'mpv'
-        current_playback_proc = subprocess.Popen(cmd, shell=True)
+        # Use the shared tts_service which uses Pygame and EdgeTTS
+        tts_service.speak(text, lang)
         
         return {"status": "playing", "gesture": text}
 
