@@ -228,7 +228,7 @@ function App() {
               <div className="card card-stat clickable" onClick={() => setAutoSpeak(!autoSpeak)}>
                 <div className="stat-icon"><i className="fas fa-volume-up"></i></div>
                 <div className="stat-info">
-                  <span className="stat-label">Auto Speak</span>
+                  <span className="stat-label">Audio Output</span>
                   <span className={`stat-value ${autoSpeak ? 'on' : 'off'}`}>{autoSpeak ? 'ON' : 'OFF'}</span>
                 </div>
               </div>
@@ -236,7 +236,7 @@ function App() {
               <div className="card card-stat clickable" onClick={() => setUseGemini(!useGemini)}>
                 <div className="stat-icon"><i className="fas fa-magic"></i></div>
                 <div className="stat-info">
-                  <span className="stat-label">AI Enhance</span>
+                  <span className="stat-label">Speak Sentence</span>
                   <span className={`stat-value ${useGemini ? 'on' : 'off'}`}>{useGemini ? 'ON' : 'OFF'}</span>
                 </div>
               </div>

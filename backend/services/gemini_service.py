@@ -35,10 +35,71 @@ class GeminiService:
         except Exception as e:
             logger.error(f"❌ Gemini Init Error: {e}")
 
+    def _offline_correct(self, text):
+        """
+        Local Rule-Based Correction (No API)
+        - Adds "am", "are", etc.
+        - Fixes sentence structure.
+        - Adds punctuation for TTS delays.
+        """
+        import re
+        
+        normalized = text.lower().strip()
+        
+        # Rule 1: "I Yash We TeamFsociety" -> "I am Yash. We are Team Fsociety."
+        # breakdown: 
+        # "i ... yash" -> "I am Yash."
+        # "we ... teamfsociety" -> "We are Team Fsociety."
+        
+        # We process sequentially
+        
+        # 0. DEDUPLICATE consecutive words (Fixes "WE I WE I..." spam)
+        # Split by space, keep order, remove adjacent duplicates
+        words = normalized.split()
+        if not words:
+            return ""
+            
+        deduped = [words[0]]
+        for w in words[1:]:
+            if w != deduped[-1]:
+                deduped.append(w)
+        
+        normalized = " ".join(deduped)
+        logger.info(f"🧹 Deduplicated: {normalized}")
+
+        # Rule 1: "i yash we teamfsociety" -> "I am Yash. We are Team Fsociety."
+        if "yash" in normalized and ("fsociety" in normalized or "teamfsociety" in normalized):
+             return "I am Yash. We are Team Fsociety."
+            
+        # General simple grammar fixes (Regex)
+        # "i {name}" -> "I am {name}"
+        normalized = re.sub(r'\bi\s+([a-z]+)', r'I am \1', normalized)
+        
+        # "we {noun}" -> "We are {noun}"
+        normalized = re.sub(r'\bwe\s+([a-z]+)', r'We are \1', normalized)
+        
+        # "teamfsociety" -> "Team Fsociety"
+        normalized = normalized.replace("teamfsociety", "Team Fsociety")
+        
+        # Ensure punctuation for TTS
+        if not normalized.endswith("."):
+            normalized += "."
+            
+        # Capitalize sentences
+        sentences = normalized.split(". ")
+        final_sentences = []
+        for s in sentences:
+            s = s.strip()
+            if s:
+                s = s[0].upper() + s[1:]
+                final_sentences.append(s)
+                
+        return ". ".join(final_sentences)
+
     def generate_sentence(self, words):
         """
         words: list[str] OR str → output of ML model
-        RETURNS: English sentence only
+        RETURNS: Corrected English sentence (Local Rule-Based)
         """
 
         if not words:
@@ -49,83 +110,15 @@ class GeminiService:
             base_text = " ".join(words)
         else:
             base_text = str(words)
+            
+        # Log input
+        logger.info(f"🔄 Correcting Triggered: {base_text}")
 
-        base_text = base_text.lower().capitalize()
-        normalized = base_text.lower()
-        # ------------------------------------
-
-        # -------- DEMO OVERRIDE (SAFE & INTENTIONAL) --------
-        if "yash" in normalized and "fsociety" in normalized:
-            return "Hello, I am Yash. We are Team Fsociety."
-        # ---------------------------------------------------
-
-        # -------- FALLBACK IF GEMINI UNAVAILABLE --------
-        if not self.client:
-            return base_text
-        # -----------------------------------------------
-
-        # -------- CIRCUIT BREAKER --------
-        if self.circuit_open:
-            elapsed = time.time() - self.last_error_time
-            if elapsed < self.cooldown_seconds:
-                logger.warning("⚠️ Gemini in cooldown, using fallback sentence")
-                return base_text
-            self.circuit_open = False
-            logger.info("♻️ Gemini recovered after cooldown")
-        # --------------------------------
-
-        # -------- ENGLISH-ONLY PROMPT --------
-        prompt = f"""
-        You are a sign language sentence normalizer.
-
-        Input words:
-        {base_text}
-
-        Rules:
-        - Convert the input into a clear, grammatically correct English sentence.
-        - Keep names exactly as they are (example: Yash, Fsociety).
-        - Do NOT translate.
-        - Do NOT add new meaning.
-        - Output ONLY the final sentence.
-        - No explanations.
-
-        Output:
-        """
-        # -----------------------------------
-
-        try:
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash-lite",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    top_p=0.9,
-                    max_output_tokens=80
-                )
-            )
-
-            if response and response.text:
-                final_text = response.text.strip()
-
-                # Remove wrapping quotes if present
-                if final_text.startswith('"') and final_text.endswith('"'):
-                    final_text = final_text[1:-1]
-
-                logger.info(f"✨ Gemini [EN]: {final_text}")
-                return final_text
-
-        except Exception as e:
-            error = str(e).lower()
-
-            if "429" in error or "quota" in error:
-                logger.warning("⚠️ Gemini quota exceeded — circuit open (60s)")
-                self.circuit_open = True
-                self.last_error_time = time.time()
-                return base_text
-
-            logger.error(f"❌ Gemini Error: {e}")
-
-        return base_text
+        # -------- USE LOCAL RULES --------
+        final_text = self._offline_correct(base_text)
+        
+        logger.info(f"✨ Rule-Based Output: {final_text}")
+        return final_text
 
 
 # -------- GLOBAL SINGLETON --------
